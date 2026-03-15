@@ -111,11 +111,6 @@ st.markdown("""
 # ── TRAIN MODEL (cached) ──────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
 def train_rf():
-    """
-    Load diabetes_dataset.csv, train Random Forest on
-    hbA1c_level + age + bmi + gender_Male only.
-    Returns: (model, scaler, test_accuracy)
-    """
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import train_test_split
@@ -123,12 +118,9 @@ def train_rf():
     from imblearn.over_sampling import SMOTE
 
     df = pd.read_csv("diabetes_dataset.csv").dropna()
-
-    # Encode gender into a single binary feature: 1 = Male, 0 = Female/Other
     df["gender_Male"] = (df["gender"] == "Male").astype(int)
 
     FEATURES = ["hbA1c_level", "age", "bmi", "gender_Male"]
-
     X = df[FEATURES].values
     y = df["diabetes"].values
 
@@ -136,7 +128,6 @@ def train_rf():
         X, y, test_size=0.2, random_state=42, stratify=y
     )
 
-    # SMOTE to balance classes
     sm = SMOTE(random_state=42)
     X_tr_sm, y_tr_sm = sm.fit_resample(X_train, y_train)
 
@@ -154,7 +145,7 @@ def train_rf():
 
 
 # ── LOAD MODEL ────────────────────────────────────────────────────────────────
-with st.spinner("🌲  Training Random Forest on diabetes_dataset.csv … (~10s first load)"):
+with st.spinner("🌲  Preparing model … please wait"):
     try:
         rf, scaler, train_acc, X_tr, y_tr = train_rf()
         model_ready = True
@@ -162,20 +153,8 @@ with st.spinner("🌲  Training Random Forest on diabetes_dataset.csv … (~10s 
         model_ready = False
 
 if not model_ready:
-    st.error("❌  `diabetes_dataset.csv` not found in the repo root. Add it to GitHub alongside `app.py`.")
+    st.error("❌  `diabetes_dataset.csv` not found. Make sure it is committed to the repo root.")
     st.stop()
-
-# Show accuracy badge once
-st.markdown(f"""
-<div style="display:flex; align-items:center; justify-content:center; gap:0.8rem;
-            margin-bottom:1.8rem;">
-  <div style="background:#e8f5f3; border:1.5px solid #b3ddd8; border-radius:50px;
-              padding:5px 18px; font-family:'JetBrains Mono',monospace;
-              font-size:0.75rem; color:#007a6e; letter-spacing:0.06em;">
-    ✓ Model ready · Test accuracy: <strong>{train_acc:.2%}</strong>
-  </div>
-</div>
-""", unsafe_allow_html=True)
 
 
 # ── INPUT FORM ────────────────────────────────────────────────────────────────
@@ -225,10 +204,9 @@ if predict_btn:
     X_input = np.array([[hba1c, age, bmi, gender_male]], dtype=np.float32)
     X_sc    = scaler.transform(X_input)
 
-    prob     = rf.predict_proba(X_sc)[0][1]
-    label    = int(prob >= 0.5)
+    prob  = rf.predict_proba(X_sc)[0][1]
+    label = int(prob >= 0.5)
 
-    # ── Risk level ──
     if prob < 0.3:
         risk_label, risk_color, bg_color, border_color, icon = \
             "LOW RISK", "#1a7a3c", "#edf7f0", "#a8d8b8", "✅"
@@ -257,7 +235,6 @@ if predict_btn:
                      color:{risk_color}; letter-spacing:-0.02em;">{risk_label}</span>
       </div>
       <p style="color:#4a4035; font-size:0.92rem; margin:0 0 1.2rem;">{desc}</p>
-
       <div style="display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
         <div style="flex:1; min-width:120px; background:rgba(255,255,255,0.7);
                     border-radius:10px; padding:0.8rem 1rem; text-align:center;">
@@ -272,7 +249,6 @@ if predict_btn:
           <div style="font-size:0.75rem; color:#7a6f62; margin-top:2px;">Diabetes Predicted</div>
         </div>
       </div>
-
       <div style="background:rgba(255,255,255,0.5); border-radius:50px; height:8px;">
         <div style="background:{risk_color}; height:8px; border-radius:50px;
                     width:{prob*100:.1f}%; transition:width 0.4s;"></div>
@@ -280,7 +256,7 @@ if predict_btn:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Input summary ──
+    # ── Input vs thresholds ──
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("""
     <div style="font-family:'JetBrains Mono',monospace; font-size:0.68rem; color:#7a6f62;
@@ -288,16 +264,16 @@ if predict_btn:
     """, unsafe_allow_html=True)
 
     thresholds = {
-        "HbA1c Level (%)":    (hba1c,  6.5,  "≥6.5% = Diabetic",   "%"),
-        "Age (years)":        (age,    45,   "Elevated risk >45",   ""),
-        "BMI":                (bmi,    30.0, "≥30 = Obese",         ""),
+        "HbA1c Level (%)": (hba1c, 6.5,  "≥6.5% = Diabetic range (ADA 2024)",  "%"),
+        "Age (years)":     (age,   45,   "Risk increases significantly after 45", ""),
+        "BMI":             (bmi,   30.0, "≥30 = Obese, elevated diabetes risk",   ""),
     }
 
     for label_t, (val, thresh, note, unit) in thresholds.items():
-        above = val >= thresh
+        above     = val >= thresh
         bar_color = "#c0392b" if above else "#007a6e"
-        bar_pct = min(val / (thresh * 1.5) * 100, 100)
-        flag = "⚠️" if above else "✓"
+        bar_pct   = min(val / (thresh * 1.5) * 100, 100)
+        flag      = "⚠️" if above else "✓"
         st.markdown(f"""
         <div style="background:#fff; border:1.5px solid #e0d8cc; border-radius:10px;
                     padding:0.8rem 1.1rem; margin-bottom:0.5rem;">
@@ -307,13 +283,14 @@ if predict_btn:
                          color:{bar_color}; font-weight:500;">{flag} {val}{unit}</span>
           </div>
           <div style="background:#e0d8cc; border-radius:50px; height:5px; margin-bottom:4px;">
-            <div style="background:{bar_color}; height:5px; border-radius:50px; width:{bar_pct:.0f}%;"></div>
+            <div style="background:{bar_color}; height:5px; border-radius:50px;
+                        width:{bar_pct:.0f}%;"></div>
           </div>
           <div style="font-size:0.72rem; color:#7a6f62;">{note}</div>
         </div>
         """, unsafe_allow_html=True)
 
-    # ── SHAP feature importance (global — from trained RF) ──
+    # ── Feature importance chart ──
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("""
     <div style="font-family:'JetBrains Mono',monospace; font-size:0.68rem; color:#7a6f62;
@@ -328,9 +305,8 @@ if predict_btn:
     fig.patch.set_facecolor('#ffffff')
     ax.set_facecolor('#f5f0e8')
 
-    colors = ['#007a6e' if i == 0 else '#4a9e94' if i == 1 else '#7abfba' if i == 2 else '#aad5d1'
-              for i in range(len(importances))]
-    sorted_colors = [colors[i] for i in order]
+    palette       = ['#007a6e', '#4a9e94', '#7abfba', '#aad5d1']
+    sorted_colors = [palette[i] for i in range(len(importances))]
 
     bars = ax.barh(
         [FEATURE_NAMES[i] for i in order],
@@ -340,13 +316,13 @@ if predict_btn:
         edgecolor='none',
     )
     for bar, val in zip(bars, importances[order]):
-        ax.text(val + 0.005, bar.get_y() + bar.get_height()/2,
+        ax.text(val + 0.005, bar.get_y() + bar.get_height() / 2,
                 f'{val:.3f}', va='center', color='#1a1410', fontsize=9,
                 fontfamily='monospace')
 
     ax.set_xlabel('Importance', color='#7a6f62', fontsize=9)
     ax.tick_params(colors='#4a4035', labelsize=9)
-    ax.spines[['top','right','bottom']].set_visible(False)
+    ax.spines[['top', 'right', 'bottom']].set_visible(False)
     ax.spines['left'].set_edgecolor('#e0d8cc')
     ax.set_xlim(0, max(importances) * 1.3)
     plt.tight_layout()

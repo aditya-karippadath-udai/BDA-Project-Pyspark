@@ -96,7 +96,7 @@ st.markdown("""
   <div style="display:inline-block; background:#007a6e; color:#fff;
               font-family:'JetBrains Mono',monospace; font-size:0.7rem;
               letter-spacing:0.14em; padding:4px 16px; border-radius:50px;
-              margin-bottom:1rem;">RANDOM FOREST · LIVE TRAINING</div>
+              margin-bottom:1rem;"> · LIVE TRAINING</div>
   <h1 style="font-family:'Outfit',sans-serif; font-size:2.8rem; font-weight:800;
              color:#1a1410; margin:0; letter-spacing:-0.03em; line-height:1.1;">
     Diabetes<span style="color:#007a6e;">Scan</span>
